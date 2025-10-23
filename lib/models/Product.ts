@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type InferSchemaType } from "mongoose";
+import { Schema, model, type Model, type InferSchemaType } from "mongoose";
 
 const ProductSchema = new Schema(
   {
@@ -16,7 +16,14 @@ const ProductSchema = new Schema(
   { timestamps: true }
 );
 
-export type ProductDoc = InferSchemaType<typeof ProductSchema>; 
-// _id:ObjectId; createdAt:Date; updatedAt:Date …
+export type ProductDoc = InferSchemaType<typeof ProductSchema>;
 
-export default (models.Product as Model<ProductDoc>) || model<ProductDoc>("Product", ProductSchema);
+// ✅ Avoid complex union by using try/catch model reuse
+let ProductModel: Model<ProductDoc>;
+try {
+  ProductModel = model<ProductDoc>("Product");
+} catch {
+  ProductModel = model<ProductDoc>("Product", ProductSchema);
+}
+
+export default ProductModel;
