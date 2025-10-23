@@ -1,5 +1,5 @@
 // lib/models/User.ts
-import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { Schema, model, type Model, type InferSchemaType } from 'mongoose';
 
 const UserSchema = new Schema(
   {
@@ -13,8 +13,14 @@ const UserSchema = new Schema(
 
 export type UserDoc = InferSchemaType<typeof UserSchema>;
 
-// ✅ Avoid the complex union by branching first, then casting once.
-const UserModel =
-  (models.User as Model<UserDoc> | undefined) ?? model<UserDoc>('User', UserSchema);
+// ✅ Avoid models.User union entirely; reuse compiled model if it exists.
+let UserModel: Model<UserDoc>;
+try {
+  // If the model is already compiled (dev/HMR), this succeeds.
+  UserModel = model<UserDoc>('User');
+} catch {
+  // Otherwise, compile it once.
+  UserModel = model<UserDoc>('User', UserSchema);
+}
 
 export default UserModel;
