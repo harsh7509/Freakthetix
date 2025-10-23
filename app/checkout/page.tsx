@@ -10,8 +10,15 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
 
+declare global {
+  interface Window {
+    Cashfree?: any;
+  }
+}
+
 const N = (v: any) => Number(v ?? 0) || 0;
-const firstImage = (p: any) => (Array.isArray(p?.images) && p.images[0]) || p?.image || undefined;
+const firstImage = (p: any) =>
+  (Array.isArray(p?.images) && p.images[0]) || p?.image || undefined;
 
 const addressSchema = z.object({
   fullName: z.string().min(2),
@@ -22,6 +29,30 @@ const addressSchema = z.object({
   state: z.string().min(2),
   pincode: z.string().min(4),
 });
+
+// Load the Cashfree JS SDK (sandbox/prod) once and return the sdk object
+async function getCashfree() {
+  if (typeof window === 'undefined') throw new Error('Window not ready');
+  if (window.Cashfree) return window.Cashfree;
+
+  const env = (process.env.NEXT_PUBLIC_CASHFREE_ENV || 'sandbox').toLowerCase();
+  const src =
+    env === 'production'
+      ? 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.prod.js'
+      : 'https://sdk.cashfree.com/js/ui/2.0.0/cashfree.sandbox.js';
+
+  await new Promise<void>((resolve, reject) => {
+    const s = document.createElement('script');
+    s.src = src;
+    s.async = true;
+    s.onload = () => resolve();
+    s.onerror = () => reject(new Error('Failed to load Cashfree SDK'));
+    document.head.appendChild(s);
+  });
+
+  if (!window.Cashfree) throw new Error('Cashfree SDK not available');
+  return window.Cashfree;
+}
 
 export default function CheckoutPage() {
   const { data: session, status } = useSession();
@@ -34,7 +65,6 @@ export default function CheckoutPage() {
   const [placing, setPlacing] = useState(false);
 
   useEffect(() => setMounted(true), []);
-
   useEffect(() => {
     if (status === 'unauthenticated' && !redirected.current) {
       redirected.current = true;
@@ -53,7 +83,10 @@ export default function CheckoutPage() {
     });
   }, [items]);
 
-  const subtotal = useMemo(() => normalized.reduce((s, i) => s + N(i.price) * N(i.qty), 0), [normalized]);
+  const subtotal = useMemo(
+    () => normalized.reduce((s, i) => s + N(i.price) * N(i.qty), 0),
+    [normalized]
+  );
 
   async function onSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -76,14 +109,17 @@ export default function CheckoutPage() {
 
     const parsed = addressSchema.safeParse(addr);
     if (!parsed.success) {
-      toast({ title: 'Invalid address', description: parsed.error.issues[0]?.message || 'Fix address fields' });
+      toast({
+        title: 'Invalid address',
+        description: parsed.error.issues[0]?.message || 'Fix address fields',
+      });
       return;
     }
 
     try {
       setPlacing(true);
 
-      // 1) Create internal order
+      // 1) Create internal order in DB
       const res = await fetch('/api/orders', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -105,7 +141,7 @@ export default function CheckoutPage() {
       const json = await res.json();
       if (!res.ok) throw new Error(json?.error || 'Order create failed');
 
-      // 2) Ask server to create Cashfree order
+      // 2) Ask server for Cashfree payment (hosted link OR session id)
       const payRes = await fetch('/api/payments/cashfree/create-order', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -120,16 +156,30 @@ export default function CheckoutPage() {
         }),
       });
       const payJson = await payRes.json();
-      // console.log('Cashfree create:', payRes.status, payJson);
 
+      // a) Hosted link available -> redirect
       if (payRes.ok && payJson?.paymentLink) {
         clear();
-        window.location.href = payJson.paymentLink; // hosted redirect
+        window.location.href = payJson.paymentLink;
         return;
       }
 
-      // Fallback: COD
-      toast({ title: 'Payment link unavailable', description: 'Order placed as COD fallback.' });
+      // b) No link, but session id present -> use Drop-in SDK
+      if (payRes.ok && payJson?.paymentSessionId) {
+        const cashfree = await getCashfree();
+        clear();
+        await cashfree.pay({
+          paymentSessionId: payJson.paymentSessionId,
+          redirectTarget: '_self',
+        });
+        return; // on success Cashfree will redirect back to your return_url
+      }
+
+      // c) Fallback to COD
+      toast({
+        title: 'Payment link unavailable',
+        description: 'Order placed as COD fallback.',
+      });
       clear();
       router.replace(`/orders/${json.orderId}`);
     } catch (err: any) {
@@ -139,7 +189,8 @@ export default function CheckoutPage() {
     }
   }
 
-  const loadingOrUnauthed = !mounted || status === 'loading' || status === 'unauthenticated';
+  const loadingOrUnauthed =
+    !mounted || status === 'loading' || status === 'unauthenticated';
 
   return (
     <div className="max-w-5xl mx-auto px-4 py-10">
@@ -147,6 +198,7 @@ export default function CheckoutPage() {
         <div className="min-h-[60vh] grid place-items-center">Loading…</div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+          {/* Address */}
           <div>
             <h2 className="text-2xl font-bold mb-4">Shipping Address</h2>
             <form onSubmit={onSubmit} className="space-y-4">
@@ -165,6 +217,7 @@ export default function CheckoutPage() {
             </form>
           </div>
 
+          {/* Summary */}
           <div>
             <h2 className="text-2xl font-bold mb-4">Order Summary</h2>
             <div className="space-y-3">
@@ -185,7 +238,9 @@ export default function CheckoutPage() {
               <div className="font-semibold">Subtotal</div>
               <div className="font-semibold">₹ {subtotal.toFixed(2)}</div>
             </div>
-            <p className="text-xs text-gray-400 mt-2">Taxes & shipping calculated at payment (if online).</p>
+            <p className="text-xs text-gray-400 mt-2">
+              Taxes & shipping calculated at payment (if online).
+            </p>
           </div>
         </div>
       )}

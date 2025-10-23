@@ -2,37 +2,48 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Button } from '@/components/ui/button';
 
 export default function OrderDetailPage() {
   const { id } = useParams<{ id: string }>();
+  const sp = useSearchParams();
   const router = useRouter();
   const [order, setOrder] = useState<any>(null);
   const [loading, setLoading] = useState(true);
 
+  const cfOrderId = sp.get('cf_order_id') || '';
+
+  async function load() {
+    try {
+      const res = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data?.error || 'Not found');
+      setOrder(data);
+    } catch (err) {
+      setOrder(null);
+    } finally {
+      setLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!id) return;
-    (async () => {
-      try {
-        const res = await fetch(`/api/orders/${id}`, { cache: 'no-store' });
-        const data = await res.json();
-        if (!res.ok) throw new Error(data?.error || 'Not found');
-        setOrder(data);
-      } catch (err) {
-        console.error('Order load error:', err);
-      } finally {
-        setLoading(false);
+    load();
+    // Poll while pending to reflect webhook update
+    const t = setInterval(() => {
+      if (order?.status === 'paid' || order?.status === 'failed') {
+        clearInterval(t);
+      } else {
+        load();
       }
-    })();
+    }, 5000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
 
   if (loading)
-    return (
-      <div className="min-h-[60vh] flex items-center justify-center">
-        Loading order…
-      </div>
-    );
+    return <div className="min-h-[60vh] flex items-center justify-center">Loading order…</div>;
 
   if (!order)
     return (
@@ -45,6 +56,12 @@ export default function OrderDetailPage() {
   return (
     <div className="max-w-3xl mx-auto px-4 py-10">
       <h1 className="text-3xl font-bold mb-4">Order Confirmation</h1>
+
+      {!!cfOrderId && (
+        <div className="mb-4 text-xs text-gray-400">
+          Cashfree Order: <span className="break-all">{cfOrderId}</span>
+        </div>
+      )}
 
       <div className="border border-white/10 p-6 rounded-lg bg-white/5 mb-6">
         <h2 className="text-xl font-semibold mb-2">Order ID</h2>
@@ -83,6 +100,10 @@ export default function OrderDetailPage() {
             <div>₹ {(i.qty * i.price).toFixed(2)}</div>
           </div>
         ))}
+      </div>
+
+      <div className="flex justify-end mt-8">
+        <Button onClick={() => router.push('/shop')}>Continue Shopping</Button>
       </div>
     </div>
   );
