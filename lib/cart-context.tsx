@@ -1,8 +1,9 @@
 'use client';
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { Product } from './supabase';
+import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
+import { Product } from './types';
 
+// ---------------- TYPES ----------------
 export type CartItem = {
   product: Product;
   quantity: number;
@@ -12,105 +13,150 @@ export type CartItem = {
 
 type CartContextType = {
   items: CartItem[];
-  addItem: (product: Product, quantity: number, size?: string, color?: string) => void;
-  removeItem: (productId: string) => void;
-  updateQuantity: (productId: string, quantity: number) => void;
+  addItem: (p: Product, q: number, s?: string, c?: string) => void;
+  removeItem: (id: string, s?: string, c?: string) => void;
+  updateQuantity: (id: string, q: number, s?: string, c?: string) => void;
   clearCart: () => void;
+
+  // aliases
+  remove: CartContextType['removeItem'];
+  updateQty: CartContextType['updateQuantity'];
+  clear: CartContextType['clearCart'];
+
   totalItems: number;
   totalPrice: number;
+  subtotal: number;
+
+  /** true once we've read localStorage on the client */
+  ready: boolean;
 };
 
-const CartContext = createContext<CartContextType | undefined>(undefined);
+// ---------------- CONSTANTS ----------------
+const CartContext = createContext<CartContextType | null>(null);
+const STORAGE_KEY = 'cart';
+const num = (v: any) => Number(v ?? 0) || 0;
+const pid = (p: Product) => String(p._id ?? (p as any).id ?? p.slug ?? p.name ?? 'x');
+const keyOf = (p: Product, s?: string, c?: string) => [pid(p), s ?? '', c ?? ''].join('|');
 
+// ---------------- PROVIDER ----------------
 export function CartProvider({ children }: { children: ReactNode }) {
+  // Start with an empty array on the server to avoid SSR/client mismatch.
   const [items, setItems] = useState<CartItem[]>([]);
+  const [ready, setReady] = useState(false);
+  const lastSnapshot = useRef<string>('[]');
 
+  // Hydrate exactly once after mount.
   useEffect(() => {
-    const stored = localStorage.getItem('cart');
-    if (stored) {
-      try {
-        setItems(JSON.parse(stored));
-      } catch (error) {
-        console.error('Error loading cart:', error);
-      }
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      const parsed: CartItem[] = raw ? JSON.parse(raw) : [];
+      const fixed = parsed.map((it) => ({
+        ...it,
+        product: { ...it.product, price: num((it.product as any).price) },
+        quantity: Math.max(1, num(it.quantity)),
+      }));
+      const snap = JSON.stringify(fixed);
+      lastSnapshot.current = snap;
+      setItems(fixed);
+    } catch {
+      // ignore
+    } finally {
+      setReady(true);
     }
   }, []);
 
+  // Persist only when data actually changes.
   useEffect(() => {
-    localStorage.setItem('cart', JSON.stringify(items));
-  }, [items]);
-
-  const addItem = (product: Product, quantity: number, size?: string, color?: string) => {
-    setItems((prev) => {
-      const existing = prev.find(
-        (item) =>
-          item.product.id === product.id &&
-          item.size === size &&
-          item.color === color
-      );
-
-      if (existing) {
-        return prev.map((item) =>
-          item.product.id === product.id &&
-          item.size === size &&
-          item.color === color
-            ? { ...item, quantity: item.quantity + quantity }
-            : item
-        );
+    if (!ready) return;
+    try {
+      const snap = JSON.stringify(items);
+      if (snap !== lastSnapshot.current) {
+        localStorage.setItem(STORAGE_KEY, snap);
+        lastSnapshot.current = snap;
       }
+    } catch {
+      // ignore
+    }
+  }, [items, ready]);
 
-      return [...prev, { product, quantity, size, color }];
+  const addItem: CartContextType['addItem'] = (product, quantity, size, color) => {
+    const q = Math.max(1, num(quantity));
+    setItems((prev) => {
+      const idx = prev.findIndex((i) => keyOf(i.product, i.size, i.color) === keyOf(product, size, color));
+      if (idx >= 0) {
+        const next = [...prev];
+        next[idx] = { ...next[idx], quantity: next[idx].quantity + q };
+        return next;
+      }
+      return [
+        ...prev,
+        {
+          product: { ...product, price: num((product as any).price) },
+          quantity: q,
+          size,
+          color,
+        },
+      ];
     });
   };
 
-  const removeItem = (productId: string) => {
-    setItems((prev) => prev.filter((item) => item.product.id !== productId));
-  };
-
-  const updateQuantity = (productId: string, quantity: number) => {
-    if (quantity <= 0) {
-      removeItem(productId);
-      return;
-    }
-
+  const removeItem: CartContextType['removeItem'] = (id, s, c) => {
     setItems((prev) =>
-      prev.map((item) =>
-        item.product.id === productId ? { ...item, quantity } : item
-      )
+      prev.filter((i) => keyOf(i.product, i.size, i.color) !== [id, s ?? '', c ?? ''].join('|')),
     );
   };
 
-  const clearCart = () => {
-    setItems([]);
+  const updateQuantity: CartContextType['updateQuantity'] = (id, q, s, c) => {
+    const qty = Math.max(0, num(q));
+    setItems((prev) =>
+      qty === 0
+        ? prev.filter((i) => keyOf(i.product, i.size, i.color) !== [id, s ?? '', c ?? ''].join('|'))
+        : prev.map((i) =>
+            keyOf(i.product, i.size, i.color) === [id, s ?? '', c ?? ''].join('|')
+              ? { ...i, quantity: qty }
+              : i,
+          ),
+    );
   };
 
-  const totalItems = items.reduce((sum, item) => sum + item.quantity, 0);
-  const totalPrice = items.reduce(
-    (sum, item) => sum + item.product.price * item.quantity,
-    0
+  const clearCart = () => setItems([]);
+
+  // totals
+  const { totalItems, totalPrice } = useMemo(() => {
+    return items.reduce(
+      (acc, it) => {
+        acc.totalItems += num(it.quantity);
+        acc.totalPrice += num((it.product as any).price) * num(it.quantity);
+        return acc;
+      },
+      { totalItems: 0, totalPrice: 0 },
+    );
+  }, [items]);
+
+  const value: CartContextType = useMemo(
+    () => ({
+      items,
+      addItem,
+      removeItem,
+      updateQuantity,
+      clearCart,
+      remove: removeItem,
+      updateQty: updateQuantity,
+      clear: clearCart,
+      totalItems,
+      totalPrice,
+      subtotal: totalPrice,
+      ready,
+    }),
+    [items, totalItems, totalPrice, ready],
   );
 
-  return (
-    <CartContext.Provider
-      value={{
-        items,
-        addItem,
-        removeItem,
-        updateQuantity,
-        clearCart,
-        totalItems,
-        totalPrice,
-      }}
-    >
-      {children}
-    </CartContext.Provider>
-  );
+  return <CartContext.Provider value={value}>{children}</CartContext.Provider>;
 }
 
+// ---------------- HOOK ----------------
 export function useCart() {
-  const context = useContext(CartContext);
-  if (context === undefined) {
-    throw new Error('useCart must be used within a CartProvider');
-  }
-  return context;
+  const ctx = useContext(CartContext);
+  if (!ctx) throw new Error('useCart must be used within a CartProvider');
+  return ctx;
 }

@@ -1,0 +1,33 @@
+import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+
+const OrderSchema = new Schema(
+  {
+    userId: { type: String, required: true, index: true },
+    items: [
+      {
+        productId: String,
+        name: String,
+        price: Number,
+        qty: Number,
+        color: String,
+      },
+    ],
+    amount: { type: Number, required: true },
+    status: { type: String, enum: ['pending', 'paid', 'failed', 'cancelled'], default: 'pending' },
+    cf_order_id: String, // Cashfree order id (optional)
+    address: {
+      fullName: String,
+      phone: String,
+      line1: String,
+      line2: String,
+      city: String,
+      state: String,
+      pincode: String,
+    },
+    meta: Schema.Types.Mixed,
+  },
+  { timestamps: true }
+);
+
+export type OrderDoc = InferSchemaType<typeof OrderSchema>;
+export default (models.Order as Model<OrderDoc>) || model<OrderDoc>('Order', OrderSchema);
