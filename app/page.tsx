@@ -1,3 +1,8 @@
+// app/page.tsx
+export const dynamic = 'force-dynamic';
+export const revalidate = 0;
+export const runtime = 'nodejs';
+
 import Link from "next/link";
 import Image from "next/image";
 import ProductCard from "@/components/ProductCard";
@@ -41,6 +46,7 @@ export default async function Home() {
           fill
           priority
           className="object-cover opacity-60"
+          sizes="100vw"
         />
         <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/40 to-black/70" />
         <div className="relative z-10 h-full flex flex-col items-center justify-center text-center px-6">
@@ -62,7 +68,7 @@ export default async function Home() {
       {/* ====== FEATURE BANNER 1 (image left, text right) ====== */}
       <section className="max-w-6xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-12 gap-8">
         <div className="relative aspect-[4/3] md:col-span-7 bg-white/5">
-          <Image src={IMG.banner1} alt="Compression Tee" fill className="object-cover" />
+          <Image src={IMG.banner1} alt="Compression Tee" fill className="object-cover" sizes="(max-width: 768px) 100vw, 55vw" />
         </div>
         <div className="md:col-span-5 flex flex-col justify-center">
           <h2 className="text-3xl md:text-4xl font-extrabold">COMPRESSION</h2>
@@ -93,7 +99,8 @@ export default async function Home() {
           </Link>
         </div>
         <div className="relative aspect-[4/3] md:col-span-7 order-1 md:order-2 bg-white/5">
-          <Image src={IMG.banner2} alt="Designed Compression" fill className="object-cover" />
+          <Image src={IMG.banner2} alt="Designed Compression" fill className="object-cover" sizes="(max-width: 768px) 100vw, 55vw"
+ />
         </div>
       </section>
 
@@ -124,7 +131,7 @@ export default async function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Link href="/shop?collection=logos" className="group relative overflow-hidden border border-white/10">
             <div className="relative aspect-[4/5] bg-white/5">
-              <Image src={IMG.col1} alt="Logos" fill className="object-cover group-hover:scale-105 transition" />
+              <Image src={IMG.col1} alt="Logos" fill className="object-cover group-hover:scale-105 transition" sizes="(max-width: 768px) 100vw, 33vw" />
             </div>
             <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">
               LOGO TEES
