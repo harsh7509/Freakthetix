@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type InferSchemaType } from 'mongoose';
+import { Schema, model, type Model, type InferSchemaType } from "mongoose";
 
 const OrderSchema = new Schema(
   {
@@ -15,8 +15,8 @@ const OrderSchema = new Schema(
     amount: { type: Number, required: true },
     status: {
       type: String,
-      enum: ['pending', 'paid', 'failed', 'cancelled'],
-      default: 'pending',
+      enum: ["pending", "paid", "failed", "cancelled"],
+      default: "pending",
     },
     cf_order_id: String,
     address: {
@@ -35,8 +35,12 @@ const OrderSchema = new Schema(
 
 export type OrderDoc = InferSchemaType<typeof OrderSchema>;
 
-const OrderModel =
-  (models.Order as Model<OrderDoc> | undefined) ??
-  model<OrderDoc>('Order', OrderSchema);
+// ✅ Fix for complex union error
+let OrderModel: Model<OrderDoc>;
+try {
+  OrderModel = model<OrderDoc>("Order");
+} catch {
+  OrderModel = model<OrderDoc>("Order", OrderSchema);
+}
 
 export default OrderModel;
