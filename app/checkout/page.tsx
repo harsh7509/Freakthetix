@@ -9,6 +9,7 @@ import { useToast } from '@/lib/store/toast';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Button } from '@/components/ui/button';
+import Image from 'next/image';
 
 declare global {
   interface Window {
@@ -156,6 +157,7 @@ export default function CheckoutPage() {
         }),
       });
       const payJson = await payRes.json();
+      console.log('CF create-order resp:', payJson);
 
       // a) Hosted link available -> redirect
       if (payRes.ok && payJson?.paymentLink) {
@@ -165,11 +167,16 @@ export default function CheckoutPage() {
       }
 
       // b) No link, but session id present -> use Drop-in SDK
-     if (payRes.ok && payJson?.paymentSessionId) {
+     const sessionId =
+   payJson?.paymentSessionId ||
+   payJson?.payment_session_id || // safety if backend ने snake_case छोड़ा
+   payJson?.raw?.payment_session_id || // कुछ अकाउंट्स ऐसे लौटाते हैं
+   null;
+  if (payRes.ok && sessionId) {
   const cashfree = await getCashfree();
   clear();
   await cashfree.checkout({
-    paymentSessionId: payJson.paymentSessionId,
+    paymentSessionId: sessionId,
     redirectTarget: '_self',
     
   });
@@ -227,7 +234,7 @@ export default function CheckoutPage() {
               {normalized.map((i) => (
                 <div key={i.id} className="flex items-center justify-between border border-white/10 p-3 rounded">
                   <div className="flex items-center gap-3">
-                    {i.img && <img src={i.img} alt="" className="w-16 h-16 object-cover rounded" />}
+                    {i.img && <Image src={i.img} alt="i.name" className="w-16 h-16 object-cover rounded" />}
                     <div>
                       <div className="font-medium">{i.name}</div>
                       <div className="text-sm text-gray-400">Qty: {i.qty}</div>

@@ -5,36 +5,31 @@ const CF_BASE = ENV === 'production'
   ? 'https://api.cashfree.com/pg'
   : 'https://sandbox.cashfree.com/pg';
 
-function missingEnv() {
-  return !process.env.CASHFREE_APP_ID || !process.env.CASHFREE_SECRET_KEY;
+function need(k: string) {
+  const v = process.env[k];
+  if (!v) throw new Error(`Missing env ${k}`);
+  return v;
 }
 
 export async function POST(req: NextRequest) {
   try {
-    if (missingEnv()) {
-      return NextResponse.json(
-        { ok: false, reason: 'cashfree_not_configured' },
-        { status: 200 }
-      );
-    }
+    const APP = need('CASHFREE_APP_ID');
+    const SEC = need('CASHFREE_SECRET_KEY');
 
     const { orderId, amount, customer } = await req.json();
-
     if (!orderId || !amount) {
-      return NextResponse.json(
-        { error: 'orderId and amount are required' },
-        { status: 400 }
-      );
+      return NextResponse.json({ error: 'orderId and amount are required' }, { status: 400 });
     }
 
-    // MUST be alphanumeric/_/-
+    const base =
+      process.env.SITE_URL ??
+      (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000');
+
     const safeCustomerId =
       (customer?.email?.replace(/[^a-zA-Z0-9_-]/g, '_')) || `user_${Date.now()}`;
 
-    const base = process.env.SITE_URL || 'http://localhost:3000';
-
     const payload = {
-      order_id: `FTX_${orderId}`,          // CF’s required field name
+      order_id: `FTX_${orderId}`,                   // unique/alnum/_/-
       order_amount: Number(amount),
       order_currency: 'INR',
       customer_details: {
@@ -48,46 +43,45 @@ export async function POST(req: NextRequest) {
       },
     };
 
-    const res = await fetch(`${CF_BASE}/orders`, {
+    const r = await fetch(`${CF_BASE}/orders`, {
       method: 'POST',
       headers: {
-        'x-client-id': process.env.CASHFREE_APP_ID!,
-        'x-client-secret': process.env.CASHFREE_SECRET_KEY!,
-        'x-api-version': '2025-01-01',
+        'x-client-id': APP,
+        'x-client-secret': SEC,
+        'x-api-version': '2025-01-01', // newer, stable
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
     });
 
-    const json = await res.json();
-
-    // Surface Cashfree’s status & message so you can see the real reason.
-    if (!res.ok) {
+    const j = await r.json();
+    if (!r.ok) {
       return NextResponse.json(
-        { error: json?.message || json?.error || 'Cashfree error', details: json },
-        { status: res.status }
+        { error: j?.message || j?.error || 'Cashfree error', details: j },
+        { status: r.status }
       );
     }
 
-    // Prefer hosted link if present; otherwise return session id
-     // Cashfree PG /orders successful response → payment_session_id
-    const paymentSessionId = json?.payment_session_id ?? null;
-    // कुछ accounts में link नहीं आता; अगर चाहिए तो /pg/links वाला अलग route बनाइए
-    const paymentLink = json?.payment_link ?? null;
+    // ---- robust extract (Cashfree कभी-कभी अलग shape देता है) ----
+    const paymentSessionId =
+      j?.payment_session_id ??
+      j?.data?.payment_session_id ??
+      j?.order_token ?? // rare legacy
+      null;
 
-    return NextResponse.json(
-      { ok: true, paymentLink, paymentSessionId, raw: json },
-      { status: 200 }
-    );
+    const paymentLink =
+      j?.payment_link ??
+      j?.order_meta?.payment_link ??
+      j?.data?.payment_link ??
+      j?.link_url ?? // अगर आपने /pg/links का flow लगा दिया हो
+      null;
+
+    return NextResponse.json({ ok: true, paymentSessionId, paymentLink, raw: j }, { status: 200 });
   } catch (e: any) {
-    return NextResponse.json(
-      { error: e?.message || 'Payment error' },
-      { status: 500 }
-    );
+    return NextResponse.json({ error: e?.message || 'Payment error' }, { status: 500 });
   }
 }
 
-// Optional: lets you GET the route in the browser and not see 405
 export async function GET() {
-  return NextResponse.json({ ok: true, route: '/api/payments/cashfree/create-order' });
+  return NextResponse.json({ ok: true });
 }
