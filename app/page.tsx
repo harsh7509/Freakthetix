@@ -3,32 +3,29 @@ export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 export const runtime = 'nodejs';
 
-import Link from "next/link";
-import Image from "next/image";
-import ProductCard from "@/components/ProductCard";
+import Link from 'next/link';
+import Image from 'next/image';
+import ProductCard from '@/components/ProductCard';
 
 // 👉 Replace these with your own images
 const IMG = {
-  hero:
-    "https://t4.ftcdn.net/jpg/14/51/73/45/360_F_1451734549_2a6WkPNBrAHikeex60PonwMDbLqQXrLb.jpg",
-  banner1:
-    "https://m.media-amazon.com/images/I/51uot7WdDUL.jpg",
-  banner2:
-    "https://allofficials.in/cdn/shop/files/Nylon_Compression_T-Shirt_Full_Sleeve_Dark-Matter_right.jpg?v=1759944716&width=533",
-  col1:
-    "https://m.media-amazon.com/images/I/61UYSaBkUnL.jpg",
-  col2:
-    "https://m.media-amazon.com/images/I/61IEOOezjSL.jpg",
-  col3:
-    "https://m.media-amazon.com/images/I/51hQQm3pKdL.jpg",
+  hero: 'https://t4.ftcdn.net/jpg/14/51/73/45/360_F_1451734549_2a6WkPNBrAHikeex60PonwMDbLqQXrLb.jpg',
+  banner1: 'https://m.media-amazon.com/images/I/51uot7WdDUL.jpg',
+  banner2: 'https://allofficials.in/cdn/shop/files/Nylon_Compression_T-Shirt_Full_Sleeve_Dark-Matter_right.jpg?v=1759944716&width=533',
+  col1: 'https://m.media-amazon.com/images/I/61UYSaBkUnL.jpg',
+  col2: 'https://m.media-amazon.com/images/I/61IEOOezjSL.jpg',
+  col3: 'https://m.media-amazon.com/images/I/51hQQm3pKdL.jpg',
 };
 
 async function getProducts() {
-  // shows a small grid lower on the page
-  const base = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
-  const res = await fetch(`${base}/api/products`, { cache: "no-store" });
-  if (!res.ok) return [];
-  return res.json();
+  // Use a relative URL so Next routes this internally both locally & on Vercel.
+  try {
+    const res = await fetch('/api/products', { cache: 'no-store' });
+    if (!res.ok) return [];
+    return res.json();
+  } catch {
+    return [];
+  }
 }
 
 export default async function Home() {
@@ -36,8 +33,6 @@ export default async function Home() {
 
   return (
     <div className="min-h-screen">
-      {/* ====== NAV is already in layout ====== */}
-
       {/* ====== HERO ====== */}
       <section className="relative h-[70vh] md:h-[85vh] w-full border-b border-white/10">
         <Image
@@ -53,9 +48,7 @@ export default async function Home() {
           <p className="tracking-[0.35em] text-xs md:text-sm text-gray-300">
             UNLEASH . DEFINE . AESTHETIX
           </p>
-          <h1 className="mt-6 text-5xl md:text-7xl font-extrabold">
-            FREAKTHETIX
-          </h1>
+          <h1 className="mt-6 text-5xl md:text-7xl font-extrabold">FREAKTHETIX</h1>
           <Link
             href="/shop"
             className="mt-8 inline-block bg-white text-black px-5 py-2 text-sm font-semibold tracking-wide hover:bg-gray-200"
@@ -65,42 +58,43 @@ export default async function Home() {
         </div>
       </section>
 
-      {/* ====== FEATURE BANNER 1 (image left, text right) ====== */}
+      {/* ====== FEATURE BANNER 1 ====== */}
       <section className="max-w-6xl mx-auto px-4 py-16 grid grid-cols-1 md:grid-cols-12 gap-8">
         <div className="relative aspect-[4/3] md:col-span-7 bg-white/5">
-          <Image src={IMG.banner1} alt="Compression Tee" fill className="object-cover" sizes="(max-width: 768px) 100vw, 55vw" />
+          <Image
+            src={IMG.banner1}
+            alt="Compression Tee"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 55vw"
+          />
         </div>
         <div className="md:col-span-5 flex flex-col justify-center">
           <h2 className="text-3xl md:text-4xl font-extrabold">COMPRESSION</h2>
-          <p className="text-gray-300 mt-3">
-            Built to grind. Premium stretch fabric, locked-in fit.
-          </p>
-          <Link
-            href="/shop"
-            className="mt-6 bg-white text-black w-max px-4 py-2 font-semibold hover:bg-gray-200"
-          >
+          <p className="text-gray-300 mt-3">Built to grind. Premium stretch fabric, locked-in fit.</p>
+          <Link href="/shop" className="mt-6 bg-white text-black w-max px-4 py-2 font-semibold hover:bg-gray-200">
             SHOP NOW
           </Link>
         </div>
       </section>
 
-      {/* ====== FEATURE BANNER 2 (text left, image right) ====== */}
+      {/* ====== FEATURE BANNER 2 ====== */}
       <section className="max-w-6xl mx-auto px-4 py-6 md:py-2 grid grid-cols-1 md:grid-cols-12 gap-8">
         <div className="md:col-span-5 order-2 md:order-1 flex flex-col justify-center">
           <h2 className="text-3xl md:text-4xl font-extrabold">DESIGNED COMPRESSION</h2>
-          <p className="text-gray-300 mt-3">
-            Graphic detail. Aggressive silhouette. Statement performance.
-          </p>
-          <Link
-            href="/shop"
-            className="mt-6 bg-white text-black w-max px-4 py-2 font-semibold hover:bg-gray-200"
-          >
+          <p className="text-gray-300 mt-3">Graphic detail. Aggressive silhouette. Statement performance.</p>
+          <Link href="/shop" className="mt-6 bg-white text-black w-max px-4 py-2 font-semibold hover:bg-gray-200">
             SHOP NOW
           </Link>
         </div>
         <div className="relative aspect-[4/3] md:col-span-7 order-1 md:order-2 bg-white/5">
-          <Image src={IMG.banner2} alt="Designed Compression" fill className="object-cover" sizes="(max-width: 768px) 100vw, 55vw"
- />
+          <Image
+            src={IMG.banner2}
+            alt="Designed Compression"
+            fill
+            className="object-cover"
+            sizes="(max-width: 768px) 100vw, 55vw"
+          />
         </div>
       </section>
 
@@ -131,29 +125,41 @@ export default async function Home() {
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <Link href="/shop?collection=logos" className="group relative overflow-hidden border border-white/10">
             <div className="relative aspect-[4/5] bg-white/5">
-              <Image src={IMG.col1} alt="Logos" fill className="object-cover group-hover:scale-105 transition" sizes="(max-width: 768px) 100vw, 33vw" />
+              <Image
+                src={IMG.col1}
+                alt="Logos"
+                fill
+                className="object-cover group-hover:scale-105 transition"
+                sizes="(max-width: 768px) 100vw, 33vw"
+              />
             </div>
-            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">
-              LOGO TEES
-            </div>
+            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">LOGO TEES</div>
           </Link>
 
           <Link href="/shop?collection=sandos" className="group relative overflow-hidden border border-white/10">
             <div className="relative aspect-[4/5] bg-white/5">
-              <Image src={IMG.col2} alt="Sandos" fill className="object-cover group-hover:scale-105 transition" />
+              <Image
+                src={IMG.col2}
+                alt="Sandos"
+                fill
+                className="object-cover group-hover:scale-105 transition"
+                sizes="(max-width: 768px) 100vw, 33vw"
+              />
             </div>
-            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">
-              SANDOS
-            </div>
+            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">SANDOS</div>
           </Link>
 
           <Link href="/shop?collection=compression" className="group relative overflow-hidden border border-white/10">
             <div className="relative aspect-[4/5] bg-white/5">
-              <Image src={IMG.col3} alt="Compression" fill className="object-cover group-hover:scale-105 transition" />
+              <Image
+                src={IMG.col3}
+                alt="Compression"
+                fill
+                className="object-cover group-hover:scale-105 transition"
+                sizes="(max-width: 768px) 100vw, 33vw"
+              />
             </div>
-            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">
-              COMPRESSION
-            </div>
+            <div className="absolute bottom-4 left-4 bg-black/70 px-3 py-1 text-sm">COMPRESSION</div>
           </Link>
         </div>
       </section>

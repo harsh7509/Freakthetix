@@ -78,7 +78,7 @@ export default function CheckoutPage() {
       const id = it.productId ?? p._id ?? p.id ?? p.slug ?? p.name ?? 'x';
       const name = it.name ?? p.name ?? 'Item';
       const price = N(it.price ?? p.price);
-      const qty = N(it.quantity ?? it.qty);
+      const qty = Math.max(1, N(it.quantity ?? it.qty ?? 1));
       return { id, name, price, qty, img: it.image ?? firstImage(p), raw: it };
     });
   }, [items]);
@@ -132,7 +132,7 @@ export default function CheckoutPage() {
             size: i.raw?.size ?? i.raw?.selectedSize,
             color: i.raw?.color ?? i.raw?.selectedColor,
           })),
-          amount: subtotal,
+          amount: Math.max(1, subtotal),
           address: addr,
           paymentMethod: 'online_or_cod',
         }),
@@ -165,15 +165,18 @@ export default function CheckoutPage() {
       }
 
       // b) No link, but session id present -> use Drop-in SDK
-      if (payRes.ok && payJson?.paymentSessionId) {
-        const cashfree = await getCashfree();
-        clear();
-        await cashfree.pay({
-          paymentSessionId: payJson.paymentSessionId,
-          redirectTarget: '_self',
-        });
-        return; // on success Cashfree will redirect back to your return_url
-      }
+     if (payRes.ok && payJson?.paymentSessionId) {
+  const cashfree = await getCashfree();
+  clear();
+  await cashfree.checkout({
+    paymentSessionId: payJson.paymentSessionId,
+    redirectTarget: '_self',
+    
+  });
+  
+  return;
+}
+
 
       // c) Fallback to COD
       toast({
@@ -211,7 +214,7 @@ export default function CheckoutPage() {
                 <div><Label>State</Label><Input name="state" required /></div>
                 <div><Label>Pincode</Label><Input name="pincode" required /></div>
               </div>
-              <Button disabled={placing} className="w-full bg-white text-black hover:bg-gray-200">
+              <Button disabled={placing || subtotal <= 0} className="w-full bg-white text-black hover:bg-gray-200">
                 {placing ? 'Placing order…' : 'Place order'}
               </Button>
             </form>

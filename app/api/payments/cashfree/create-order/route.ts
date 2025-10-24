@@ -31,10 +31,7 @@ export async function POST(req: NextRequest) {
     const safeCustomerId =
       (customer?.email?.replace(/[^a-zA-Z0-9_-]/g, '_')) || `user_${Date.now()}`;
 
-    const base =
-      process.env.NEXTAUTH_URL ||
-      process.env.NEXT_PUBLIC_BASE_URL ||
-      'http://localhost:3000';
+    const base = process.env.SITE_URL || 'http://localhost:3000';
 
     const payload = {
       order_id: `FTX_${orderId}`,          // CF’s required field name
@@ -56,7 +53,7 @@ export async function POST(req: NextRequest) {
       headers: {
         'x-client-id': process.env.CASHFREE_APP_ID!,
         'x-client-secret': process.env.CASHFREE_SECRET_KEY!,
-        'x-api-version': '2022-09-01',
+        'x-api-version': '2025-01-01',
         'Content-Type': 'application/json',
       },
       body: JSON.stringify(payload),
@@ -73,16 +70,10 @@ export async function POST(req: NextRequest) {
     }
 
     // Prefer hosted link if present; otherwise return session id
-    const paymentLink =
-      json?.payment_link ||
-      json?.order_meta?.payment_link ||
-      json?.data?.payment_link ||
-      null;
-
-    const paymentSessionId =
-      json?.payment_session_id ||
-      json?.data?.payment_session_id ||
-      null;
+     // Cashfree PG /orders successful response → payment_session_id
+    const paymentSessionId = json?.payment_session_id ?? null;
+    // कुछ accounts में link नहीं आता; अगर चाहिए तो /pg/links वाला अलग route बनाइए
+    const paymentLink = json?.payment_link ?? null;
 
     return NextResponse.json(
       { ok: true, paymentLink, paymentSessionId, raw: json },
