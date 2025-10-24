@@ -1,29 +1,42 @@
+// lib/db.ts
 import mongoose from 'mongoose';
 
-const MONGODB_URI = process.env.MONGODB_URI!;
-if (!MONGODB_URI) throw new Error('Please set MONGODB_URI in .env');
+const globalAny = global as any;
 
-let cached = (global as any)._mongooseCached as {
+let cached = globalAny._mongooseCached as {
   conn: typeof mongoose | null;
   promise: Promise<typeof mongoose> | null;
 };
-if (!cached) cached = (global as any)._mongooseCached = { conn: null, promise: null };
+
+if (!cached) {
+  cached = { conn: null, promise: null };
+  globalAny._mongooseCached = cached;
+}
 
 export async function dbConnect() {
   if (cached.conn) return cached.conn;
-  if (!cached.promise) {
-    cached.promise = mongoose.connect(MONGODB_URI, {
-      dbName: 'freakthetix',
-      serverSelectionTimeoutMS: 8000,   // 👈 जल्दी fail हो, UI में समझ आए
-      socketTimeoutMS: 20000,
-    }).then((conn) => {
-      console.log('[MONGOOSE] connected to', conn?.connection?.db?.databaseName ?? '(unknown)');
-      return conn;
-    }).catch((err) => {
-      console.error('[MONGOOSE] connect error:', err?.message);
-      throw err;
-    });
+
+  const uri = process.env.MONGODB_URI;
+  if (!uri) {
+    // Don't throw at import-time; throw here with clear message
+    throw new Error(
+      'MONGODB_URI is not set. Add it in Vercel Project Settings → Environment Variables (and locally in .env.local).'
+    );
   }
+
+  if (!cached.promise) {
+    cached.promise = mongoose
+      .connect(uri, {
+        dbName: 'freakthetix',
+        serverSelectionTimeoutMS: 8000,
+        socketTimeoutMS: 20000,
+      })
+      .then((conn) => {
+        console.log('[MONGOOSE] connected to', conn?.connection?.db?.databaseName);
+        return conn;
+      });
+  }
+
   cached.conn = await cached.promise;
   return cached.conn;
 }
