@@ -1,4 +1,4 @@
-import { Schema, model, models, type Model, type InferSchemaType } from "mongoose";
+import { Schema, model, type Model, type InferSchemaType } from "mongoose";
 
 const ProductSchema = new Schema(
   {
@@ -18,9 +18,12 @@ const ProductSchema = new Schema(
 
 export type ProductDoc = InferSchemaType<typeof ProductSchema>;
 
-// ✅ Avoid complex inline union: branch first, then export once.
-const ProductModel =
-  (models.Product as Model<ProductDoc> | undefined) ??
-  model<ProductDoc>("Product", ProductSchema);
+// ✅ Avoid complex union by using try/catch model reuse
+let ProductModel: Model<ProductDoc>;
+try {
+  ProductModel = model<ProductDoc>("Product");
+} catch {
+  ProductModel = model<ProductDoc>("Product", ProductSchema);
+}
 
 export default ProductModel;
